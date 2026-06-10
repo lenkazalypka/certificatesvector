@@ -19,6 +19,13 @@ type ShareNavigator = Navigator & {
   canShare?: (data: ShareData) => boolean;
 };
 
+type PreparedFile = {
+  blob: Blob;
+  fileName: string;
+  label: string;
+  url: string;
+};
+
 function fromSource(value: number) {
   return (value / SOURCE_WIDTH) * CERTIFICATE_WIDTH;
 }
@@ -46,19 +53,6 @@ function isAppleMobile() {
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
   );
-}
-
-function openMobileDownloadWindow() {
-  if (!isAppleMobile()) return null;
-
-  const fileWindow = window.open("", "_blank");
-  if (!fileWindow) return null;
-
-  fileWindow.document.title = "Файл готовится";
-  fileWindow.document.body.innerHTML =
-    '<div style="font-family:Arial,sans-serif;padding:24px;line-height:1.5;color:#111">Готовим файл...</div>';
-
-  return fileWindow;
 }
 
 function loadImage(src: string) {
@@ -118,7 +112,18 @@ async function createCertificateCanvas(fio: string) {
   return canvas;
 }
 
-async function deliverFile(blob: Blob, fileName: string, mobileWindow: Window | null) {
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+async function shareBlob(blob: Blob, fileName: string) {
   const file =
     typeof File === "undefined" ? null : new File([blob], fileName, { type: blob.type });
   const shareNavigator = navigator as ShareNavigator;
@@ -133,31 +138,9 @@ async function deliverFile(blob: Blob, fileName: string, mobileWindow: Window | 
     }
   })();
 
-  if (file && canShareFile) {
-    try {
-      await navigator.share({ files: [file], title: fileName });
-      mobileWindow?.close();
-      return;
-    } catch {
-      // iOS can reject share after async rendering; fall back to opening the file.
-    }
-  }
+  if (!file || !canShareFile) throw new Error("Sharing is unavailable");
 
-  const url = URL.createObjectURL(blob);
-
-  if (mobileWindow && !mobileWindow.closed) {
-    mobileWindow.location.href = url;
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    return;
-  }
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  await navigator.share({ files: [file], title: fileName });
 }
 
 export default function CertificateGenerator() {
@@ -166,6 +149,7 @@ export default function CertificateGenerator() {
   const [previewScale, setPreviewScale] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState("");
+  const [preparedFile, setPreparedFile] = useState<PreparedFile | null>(null);
 
   const safeName = useMemo(
     () => fio.trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "") || "certificate",
@@ -188,18 +172,44 @@ export default function CertificateGenerator() {
     return () => observer.disconnect();
   }, []);
 
-  const handlePngExport = async () => {
-    const mobileWindow = openMobileDownloadWindow();
+  useEffect(() => {
+    return () => {
+      if (preparedFile) URL.revokeObjectURL(preparedFile.url);
+    };
+  }, [preparedFile]);
 
+  const clearPreparedFile = () => {
+    setPreparedFile((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return null;
+    });
+  };
+
+  const deliverGeneratedFile = (blob: Blob, fileName: string, label: string) => {
+    clearPreparedFile();
+
+    if (!isAppleMobile()) {
+      downloadBlob(blob, fileName);
+      return;
+    }
+
+    setPreparedFile({
+      blob,
+      fileName,
+      label,
+      url: URL.createObjectURL(blob),
+    });
+  };
+
+  const handlePngExport = async () => {
     setError("");
     setIsExporting(true);
 
     try {
       const canvas = await createCertificateCanvas(fio);
       const blob = await canvasToBlob(canvas, "image/png");
-      await deliverFile(blob, `${safeName}.png`, mobileWindow);
+      deliverGeneratedFile(blob, `${safeName}.png`, "PNG готов");
     } catch {
-      mobileWindow?.close();
       setError("Не удалось подготовить PNG. Проверьте, что шаблон загрузился.");
     } finally {
       setIsExporting(false);
@@ -207,8 +217,6 @@ export default function CertificateGenerator() {
   };
 
   const handlePdfExport = async () => {
-    const mobileWindow = openMobileDownloadWindow();
-
     setError("");
     setIsExporting(true);
 
@@ -218,12 +226,23 @@ export default function CertificateGenerator() {
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       pdf.addImage(dataUrl, "PNG", 0, 0, 210, 297);
       const blob = pdf.output("blob");
-      await deliverFile(blob, `${safeName}.pdf`, mobileWindow);
+      deliverGeneratedFile(blob, `${safeName}.pdf`, "PDF готов");
     } catch {
-      mobileWindow?.close();
       setError("Не удалось подготовить PDF. Попробуйте повторить экспорт.");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handlePreparedShare = async () => {
+    if (!preparedFile) return;
+
+    setError("");
+
+    try {
+      await shareBlob(preparedFile.blob, preparedFile.fileName);
+    } catch {
+      setError("Не удалось открыть меню «Поделиться». Нажмите «Открыть файл».");
     }
   };
 
@@ -259,6 +278,30 @@ export default function CertificateGenerator() {
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {error}
               </p>
+            )}
+
+            {preparedFile && (
+              <div className="rounded-md border border-brass/30 bg-amber-50 px-3 py-3">
+                <p className="mb-3 text-sm font-semibold text-stone-900">{preparedFile.label}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <a
+                    href={preparedFile.url}
+                    download={preparedFile.fileName}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex h-11 items-center justify-center rounded-md bg-stone-900 px-4 text-center text-sm font-semibold text-white transition hover:bg-stone-800 active:translate-y-px"
+                  >
+                    Открыть файл
+                  </a>
+                  <button
+                    type="button"
+                    onClick={handlePreparedShare}
+                    className="h-11 rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:bg-stone-50 active:translate-y-px"
+                  >
+                    Поделиться
+                  </button>
+                </div>
+              </div>
             )}
 
             <div className="grid grid-cols-2 gap-3 pt-2">
