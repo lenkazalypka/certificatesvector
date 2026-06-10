@@ -1,20 +1,22 @@
 "use client";
 
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
 
 const SOURCE_WIDTH = 2480;
 const SOURCE_HEIGHT = 3508;
 const CERTIFICATE_WIDTH = 794;
 const CERTIFICATE_HEIGHT = 1123;
-const EXPORT_SCALE = SOURCE_WIDTH / CERTIFICATE_WIDTH;
 
 const FIO_FIELD = {
   sourceLeft: 478,
   sourceTop: 1656,
   sourceWidth: 1525,
   sourceFontSize: 76,
+};
+
+type ShareNavigator = Navigator & {
+  canShare?: (data: ShareData) => boolean;
 };
 
 function fromSource(value: number) {
@@ -39,8 +41,126 @@ function fioStyle(): CSSProperties {
   };
 }
 
+function isAppleMobile() {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+function openMobileDownloadWindow() {
+  if (!isAppleMobile()) return null;
+
+  const fileWindow = window.open("", "_blank");
+  if (!fileWindow) return null;
+
+  fileWindow.document.title = "Файл готовится";
+  fileWindow.document.body.innerHTML =
+    '<div style="font-family:Arial,sans-serif;padding:24px;line-height:1.5;color:#111">Готовим файл...</div>';
+
+  return fileWindow;
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Image load failed"));
+    image.src = src;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+
+      reject(new Error("Canvas export failed"));
+    }, type);
+  });
+}
+
+async function createCertificateCanvas(fio: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = SOURCE_WIDTH;
+  canvas.height = SOURCE_HEIGHT;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas is unavailable");
+
+  const background = await loadImage("/certificates/participant.png");
+  ctx.drawImage(background, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
+
+  const name = fio.trim();
+  if (name) {
+    let fontSize = FIO_FIELD.sourceFontSize;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#071d49";
+
+    do {
+      ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
+      if (ctx.measureText(name).width <= FIO_FIELD.sourceWidth - 48 || fontSize <= 48) break;
+      fontSize -= 2;
+    } while (fontSize > 48);
+
+    ctx.fillText(
+      name,
+      FIO_FIELD.sourceLeft + FIO_FIELD.sourceWidth / 2,
+      FIO_FIELD.sourceTop,
+      FIO_FIELD.sourceWidth,
+    );
+  }
+
+  return canvas;
+}
+
+async function deliverFile(blob: Blob, fileName: string, mobileWindow: Window | null) {
+  const file =
+    typeof File === "undefined" ? null : new File([blob], fileName, { type: blob.type });
+  const shareNavigator = navigator as ShareNavigator;
+  const canShareFile = (() => {
+    if (!isAppleMobile() || !file || !navigator.share) return false;
+    if (!shareNavigator.canShare) return true;
+
+    try {
+      return shareNavigator.canShare({ files: [file] });
+    } catch {
+      return false;
+    }
+  })();
+
+  if (file && canShareFile) {
+    try {
+      await navigator.share({ files: [file], title: fileName });
+      mobileWindow?.close();
+      return;
+    } catch {
+      // iOS can reject share after async rendering; fall back to opening the file.
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+
+  if (mobileWindow && !mobileWindow.closed) {
+    mobileWindow.location.href = url;
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export default function CertificateGenerator() {
-  const certificateRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [fio, setFio] = useState("Иванова Мария Сергеевна");
   const [previewScale, setPreviewScale] = useState(1);
@@ -68,30 +188,18 @@ export default function CertificateGenerator() {
     return () => observer.disconnect();
   }, []);
 
-  const createCertificatePng = async () => {
-    if (!certificateRef.current) return "";
-
-    return toPng(certificateRef.current, {
-      cacheBust: true,
-      pixelRatio: EXPORT_SCALE,
-      width: CERTIFICATE_WIDTH,
-      height: CERTIFICATE_HEIGHT,
-      canvasWidth: SOURCE_WIDTH,
-      canvasHeight: SOURCE_HEIGHT,
-    });
-  };
-
   const handlePngExport = async () => {
+    const mobileWindow = openMobileDownloadWindow();
+
     setError("");
     setIsExporting(true);
 
     try {
-      const dataUrl = await createCertificatePng();
-      const link = document.createElement("a");
-      link.download = `${safeName}.png`;
-      link.href = dataUrl;
-      link.click();
+      const canvas = await createCertificateCanvas(fio);
+      const blob = await canvasToBlob(canvas, "image/png");
+      await deliverFile(blob, `${safeName}.png`, mobileWindow);
     } catch {
+      mobileWindow?.close();
       setError("Не удалось подготовить PNG. Проверьте, что шаблон загрузился.");
     } finally {
       setIsExporting(false);
@@ -99,15 +207,20 @@ export default function CertificateGenerator() {
   };
 
   const handlePdfExport = async () => {
+    const mobileWindow = openMobileDownloadWindow();
+
     setError("");
     setIsExporting(true);
 
     try {
-      const dataUrl = await createCertificatePng();
+      const canvas = await createCertificateCanvas(fio);
+      const dataUrl = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       pdf.addImage(dataUrl, "PNG", 0, 0, 210, 297);
-      pdf.save(`${safeName}.pdf`);
+      const blob = pdf.output("blob");
+      await deliverFile(blob, `${safeName}.pdf`, mobileWindow);
     } catch {
+      mobileWindow?.close();
       setError("Не удалось подготовить PDF. Попробуйте повторить экспорт.");
     } finally {
       setIsExporting(false);
@@ -200,7 +313,6 @@ export default function CertificateGenerator() {
                 }}
               >
                 <div
-                  ref={certificateRef}
                   className="certificate-stage relative overflow-hidden bg-white font-certificate shadow-[0_18px_60px_-30px_rgba(38,33,27,0.7)]"
                   style={{
                     width: CERTIFICATE_WIDTH,
