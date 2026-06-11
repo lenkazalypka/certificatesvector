@@ -3,16 +3,24 @@
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 
-const SOURCE_WIDTH = 2480;
-const SOURCE_HEIGHT = 3508;
 const CERTIFICATE_WIDTH = 794;
 const CERTIFICATE_HEIGHT = 1123;
 
-const FIO_FIELD = {
-  sourceLeft: 478,
-  sourceTop: 1656,
-  sourceWidth: 1525,
-  sourceFontSize: 76,
+type FioField = {
+  sourceLeft: number;
+  sourceTop: number;
+  sourceWidth: number;
+  sourceFontSize: number;
+};
+
+type CertificateTemplate = {
+  id: string;
+  title: string;
+  group: "participant" | "camp";
+  background: string;
+  sourceWidth: number;
+  sourceHeight: number;
+  fio: FioField;
 };
 
 type ShareNavigator = Navigator & {
@@ -26,20 +34,83 @@ type PreparedFile = {
   url: string;
 };
 
-function fromSource(value: number) {
-  return (value / SOURCE_WIDTH) * CERTIFICATE_WIDTH;
+const PARTICIPANT_FIO: FioField = {
+  sourceLeft: 478,
+  sourceTop: 1656,
+  sourceWidth: 1525,
+  sourceFontSize: 76,
+};
+
+const CAMP_FIO: FioField = {
+  sourceLeft: 422,
+  sourceTop: 1644,
+  sourceWidth: 1640,
+  sourceFontSize: 76,
+};
+
+const CAMP_ACTIVE_FIO: FioField = {
+  ...CAMP_FIO,
+  sourceTop: 1660,
+};
+
+const CAMP_TEMPLATES: Array<{ id: string; title: string; file: string; fio?: FioField }> = [
+  { id: "druzhnyy", title: "Самый дружный", file: "druzhnyy.png" },
+  { id: "zabavnyy", title: "Самый забавный", file: "zabavnyy.png" },
+  { id: "aktivnyy", title: "Самый активный", file: "aktivnyy.png", fio: CAMP_ACTIVE_FIO },
+  { id: "druzhelyubnyy", title: "Самый дружелюбный", file: "druzhelyubnyy.png" },
+  { id: "tvorcheskiy", title: "Самый творческий", file: "tvorcheskiy.png" },
+  { id: "lovkiy", title: "Самый ловкий", file: "lovkiy.png" },
+  { id: "skromnyy", title: "Самый скромный", file: "skromnyy.png" },
+  { id: "muzykalnyy", title: "Самый музыкальный", file: "muzykalnyy.png" },
+  { id: "vnimatelnyy", title: "Самый внимательный", file: "vnimatelnyy.png" },
+  { id: "otvetstvennyy", title: "Самый ответственный", file: "otvetstvennyy.png" },
+  { id: "prikolnyy", title: "Самый прикольный", file: "prikolnyy.png" },
+  { id: "obshchitelnyy", title: "Самый общительный", file: "obshchitelnyy.png" },
+  { id: "sportivnyy", title: "Самый спортивный", file: "sportivnyy.png" },
+  { id: "otzyvchivyy", title: "Самый отзывчивый", file: "otzyvchivyy.png" },
+  { id: "vezhlivyy", title: "Самый вежливый", file: "vezhlivyy.png" },
+  { id: "dobryy", title: "Самый добрый", file: "dobryy.png" },
+  { id: "lyuboznatelnyy", title: "Самый любознательный", file: "lyuboznatelnyy.png" },
+  { id: "veselyy", title: "Самый веселый", file: "veselyy.png" },
+  { id: "kreativnyy", title: "Самый креативный", file: "kreativnyy.png" },
+  { id: "talantlivyy", title: "Самый талантливый", file: "talantlivyy.png" },
+];
+
+const CERTIFICATES: CertificateTemplate[] = [
+  {
+    id: "participant",
+    title: "Сертификат участника",
+    group: "participant",
+    background: "/certificates/participant.png",
+    sourceWidth: 2480,
+    sourceHeight: 3508,
+    fio: PARTICIPANT_FIO,
+  },
+  ...CAMP_TEMPLATES.map((template) => ({
+    id: `camp-${template.id}`,
+    title: template.title,
+    group: "camp" as const,
+    background: `/certificates/camp/${template.file}`,
+    sourceWidth: 2482,
+    sourceHeight: 3508,
+    fio: template.fio ?? CAMP_FIO,
+  })),
+];
+
+function fromSourceX(value: number, template: CertificateTemplate) {
+  return (value / template.sourceWidth) * CERTIFICATE_WIDTH;
 }
 
-function fromSourceY(value: number) {
-  return (value / SOURCE_HEIGHT) * CERTIFICATE_HEIGHT;
+function fromSourceY(value: number, template: CertificateTemplate) {
+  return (value / template.sourceHeight) * CERTIFICATE_HEIGHT;
 }
 
-function fioStyle(): CSSProperties {
+function fioStyle(template: CertificateTemplate): CSSProperties {
   return {
-    top: fromSourceY(FIO_FIELD.sourceTop),
-    left: fromSource(FIO_FIELD.sourceLeft),
-    width: fromSource(FIO_FIELD.sourceWidth),
-    fontSize: fromSource(FIO_FIELD.sourceFontSize),
+    top: fromSourceY(template.fio.sourceTop, template),
+    left: fromSourceX(template.fio.sourceLeft, template),
+    width: fromSourceX(template.fio.sourceWidth, template),
+    fontSize: fromSourceX(template.fio.sourceFontSize, template),
     lineHeight: 1.08,
     fontWeight: 700,
     color: "#071d49",
@@ -77,35 +148,35 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string) {
   });
 }
 
-async function createCertificateCanvas(fio: string) {
+async function createCertificateCanvas(fio: string, template: CertificateTemplate) {
   const canvas = document.createElement("canvas");
-  canvas.width = SOURCE_WIDTH;
-  canvas.height = SOURCE_HEIGHT;
+  canvas.width = template.sourceWidth;
+  canvas.height = template.sourceHeight;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas is unavailable");
 
-  const background = await loadImage("/certificates/participant.png");
-  ctx.drawImage(background, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
+  const background = await loadImage(template.background);
+  ctx.drawImage(background, 0, 0, template.sourceWidth, template.sourceHeight);
 
   const name = fio.trim();
   if (name) {
-    let fontSize = FIO_FIELD.sourceFontSize;
+    let fontSize = template.fio.sourceFontSize;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillStyle = "#071d49";
 
     do {
       ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
-      if (ctx.measureText(name).width <= FIO_FIELD.sourceWidth - 48 || fontSize <= 48) break;
+      if (ctx.measureText(name).width <= template.fio.sourceWidth - 48 || fontSize <= 48) break;
       fontSize -= 2;
     } while (fontSize > 48);
 
     ctx.fillText(
       name,
-      FIO_FIELD.sourceLeft + FIO_FIELD.sourceWidth / 2,
-      FIO_FIELD.sourceTop,
-      FIO_FIELD.sourceWidth,
+      template.fio.sourceLeft + template.fio.sourceWidth / 2,
+      template.fio.sourceTop,
+      template.fio.sourceWidth,
     );
   }
 
@@ -145,15 +216,22 @@ async function shareBlob(blob: Blob, fileName: string) {
 
 export default function CertificateGenerator() {
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedId, setSelectedId] = useState(CERTIFICATES[0].id);
   const [fio, setFio] = useState("Иванова Мария Сергеевна");
   const [previewScale, setPreviewScale] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState("");
   const [preparedFile, setPreparedFile] = useState<PreparedFile | null>(null);
+  const selectedTemplate =
+    CERTIFICATES.find((template) => template.id === selectedId) ?? CERTIFICATES[0];
 
   const safeName = useMemo(
-    () => fio.trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "") || "certificate",
-    [fio],
+    () =>
+      [selectedTemplate.id, fio.trim()]
+        .join("-")
+        .replace(/[^\p{L}\p{N}]+/gu, "-")
+        .replace(/^-|-$/g, "") || "certificate",
+    [fio, selectedTemplate.id],
   );
 
   useEffect(() => {
@@ -206,7 +284,7 @@ export default function CertificateGenerator() {
     setIsExporting(true);
 
     try {
-      const canvas = await createCertificateCanvas(fio);
+      const canvas = await createCertificateCanvas(fio, selectedTemplate);
       const blob = await canvasToBlob(canvas, "image/png");
       deliverGeneratedFile(blob, `${safeName}.png`, "PNG готов");
     } catch {
@@ -221,7 +299,7 @@ export default function CertificateGenerator() {
     setIsExporting(true);
 
     try {
-      const canvas = await createCertificateCanvas(fio);
+      const canvas = await createCertificateCanvas(fio, selectedTemplate);
       const dataUrl = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       pdf.addImage(dataUrl, "PNG", 0, 0, 210, 297);
@@ -255,15 +333,37 @@ export default function CertificateGenerator() {
               Вектор будущего
             </p>
             <h1 className="text-2xl font-semibold tracking-tight text-ink">
-              Сертификат участника
+              Генератор сертификатов
             </h1>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              Введите ФИО участника и скачайте готовый сертификат. Остальной текст уже находится в
-              шаблоне.
+              Выберите шаблон, введите ФИО участника и скачайте готовый файл. Остальной текст уже
+              находится в шаблоне.
             </p>
           </div>
 
           <div className="space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-stone-800">Шаблон</span>
+              <select
+                value={selectedId}
+                onChange={(event) => {
+                  setSelectedId(event.target.value);
+                  clearPreparedFile();
+                  setError("");
+                }}
+                className="h-11 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-brass focus:ring-4 focus:ring-brass/10"
+              >
+                <option value="participant">Сертификат участника</option>
+                <optgroup label="Future Leaders Camp">
+                  {CERTIFICATES.filter((template) => template.group === "camp").map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.title}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </label>
+
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-stone-800">ФИО</span>
               <input
@@ -331,7 +431,7 @@ export default function CertificateGenerator() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brass">
                 Live preview
               </p>
-              <h2 className="mt-1 text-lg font-semibold text-ink">Один шаблон для участников</h2>
+              <h2 className="mt-1 text-lg font-semibold text-ink">{selectedTemplate.title}</h2>
             </div>
             <p className="hidden text-sm text-stone-600 sm:block">A4, 300 DPI</p>
           </div>
@@ -363,7 +463,7 @@ export default function CertificateGenerator() {
                   }}
                 >
                   <img
-                    src="/certificates/participant.png"
+                    src={selectedTemplate.background}
                     className="absolute inset-0 h-full w-full object-cover"
                     alt=""
                     draggable={false}
@@ -372,7 +472,7 @@ export default function CertificateGenerator() {
                   <div
                     data-testid="fio-layer"
                     className="absolute whitespace-pre-line break-words"
-                    style={fioStyle()}
+                    style={fioStyle(selectedTemplate)}
                   >
                     {fio}
                   </div>
