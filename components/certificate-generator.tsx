@@ -48,32 +48,27 @@ const CAMP_FIO: FioField = {
   sourceFontSize: 76,
 };
 
-const CAMP_ACTIVE_FIO: FioField = {
-  ...CAMP_FIO,
-  sourceTop: 1660,
-};
-
 const CAMP_TEMPLATES: Array<{ id: string; title: string; file: string; fio?: FioField }> = [
-  { id: "druzhnyy", title: "Самый дружный", file: "druzhnyy.png" },
-  { id: "zabavnyy", title: "Самый забавный", file: "zabavnyy.png" },
-  { id: "aktivnyy", title: "Самый активный", file: "aktivnyy.png", fio: CAMP_ACTIVE_FIO },
-  { id: "druzhelyubnyy", title: "Самый дружелюбный", file: "druzhelyubnyy.png" },
-  { id: "tvorcheskiy", title: "Самый творческий", file: "tvorcheskiy.png" },
-  { id: "lovkiy", title: "Самый ловкий", file: "lovkiy.png" },
-  { id: "skromnyy", title: "Самый скромный", file: "skromnyy.png" },
-  { id: "muzykalnyy", title: "Самый музыкальный", file: "muzykalnyy.png" },
   { id: "vnimatelnyy", title: "Самый внимательный", file: "vnimatelnyy.png" },
-  { id: "otvetstvennyy", title: "Самый ответственный", file: "otvetstvennyy.png" },
-  { id: "prikolnyy", title: "Самый прикольный", file: "prikolnyy.png" },
-  { id: "obshchitelnyy", title: "Самый общительный", file: "obshchitelnyy.png" },
-  { id: "sportivnyy", title: "Самый спортивный", file: "sportivnyy.png" },
-  { id: "otzyvchivyy", title: "Самый отзывчивый", file: "otzyvchivyy.png" },
-  { id: "vezhlivyy", title: "Самый вежливый", file: "vezhlivyy.png" },
-  { id: "dobryy", title: "Самый добрый", file: "dobryy.png" },
-  { id: "lyuboznatelnyy", title: "Самый любознательный", file: "lyuboznatelnyy.png" },
-  { id: "veselyy", title: "Самый веселый", file: "veselyy.png" },
+  { id: "komandnyy", title: "Лучший командный игрок", file: "druzhnyy.png" },
+  { id: "tvorcheskiy", title: "Самый творческий", file: "tvorcheskiy.png" },
+  { id: "druzhelyubnyy", title: "Самый дружелюбный", file: "druzhelyubnyy.png" },
+  { id: "aktivnyy", title: "Самый активный", file: "aktivnyy.png" },
+  { id: "zabavnyy", title: "Самый забавный", file: "zabavnyy.png" },
+  { id: "skromnyy", title: "Самый скромный", file: "skromnyy.png" },
   { id: "kreativnyy", title: "Самый креативный", file: "kreativnyy.png" },
   { id: "talantlivyy", title: "Самый талантливый", file: "talantlivyy.png" },
+  { id: "otvetstvennyy", title: "Самый ответственный", file: "otvetstvennyy.png" },
+  { id: "dobryy", title: "Самый добрый", file: "dobryy.png" },
+  { id: "veselyy", title: "Самый веселый", file: "veselyy.png" },
+  { id: "lovkiy", title: "Самый ловкий", file: "lovkiy.png" },
+  { id: "otzyvchivyy", title: "Самый отзывчивый", file: "otzyvchivyy.png" },
+  { id: "sportivnyy", title: "Самый спортивный", file: "sportivnyy.png" },
+  { id: "vezhlivyy", title: "Самый вежливый", file: "vezhlivyy.png" },
+  { id: "lyuboznatelnyy", title: "Самый любознательный", file: "lyuboznatelnyy.png" },
+  { id: "obshchitelnyy", title: "Самый общительный", file: "obshchitelnyy.png" },
+  { id: "prikolnyy", title: "Самый прикольный", file: "prikolnyy.png" },
+  { id: "muzykalnyy", title: "Самый музыкальный", file: "muzykalnyy.png" },
 ];
 
 const CERTIFICATES: CertificateTemplate[] = [
