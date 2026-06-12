@@ -5,6 +5,7 @@ import { jsPDF } from "jspdf";
 
 const CERTIFICATE_WIDTH = 794;
 const CERTIFICATE_HEIGHT = 1123;
+const FIO_NUDGE_STORAGE_KEY = "certificate-fio-nudges-v1";
 
 type FioField = {
   sourceLeft: number;
@@ -38,14 +39,14 @@ const PARTICIPANT_FIO: FioField = {
   sourceLeft: 478,
   sourceTop: 1656,
   sourceWidth: 1525,
-  sourceFontSize: 76,
+  sourceFontSize: 72,
 };
 
 const CAMP_FIO: FioField = {
   sourceLeft: 422,
   sourceTop: 1644,
   sourceWidth: 1640,
-  sourceFontSize: 76,
+  sourceFontSize: 72,
 };
 
 const makeCampFio = (sourceTop: number): FioField => ({
@@ -96,6 +97,16 @@ const CERTIFICATES: CertificateTemplate[] = [
     fio: template.fio ?? CAMP_FIO,
   })),
 ];
+
+function withNudge(template: CertificateTemplate, nudge: number): CertificateTemplate {
+  return {
+    ...template,
+    fio: {
+      ...template.fio,
+      sourceTop: template.fio.sourceTop + nudge,
+    },
+  };
+}
 
 function fromSourceX(value: number, template: CertificateTemplate) {
   return (value / template.sourceWidth) * CERTIFICATE_WIDTH;
@@ -173,10 +184,11 @@ async function createCertificateCanvas(fio: string, template: CertificateTemplat
 
     do {
       ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
-      if (ctx.measureText(name).width <= template.fio.sourceWidth - 48 || fontSize <= 48) break;
+      if (ctx.measureText(name).width <= template.fio.sourceWidth - 48 || fontSize <= 44) break;
       fontSize -= 2;
-    } while (fontSize > 48);
+    } while (fontSize > 44);
 
+    ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
     ctx.fillText(
       name,
       template.fio.sourceLeft + template.fio.sourceWidth / 2,
@@ -230,11 +242,7 @@ function FioPreview({ fio, template }: { fio: string; template: CertificateTempl
     if (!container || !text) return;
     const containerWidth = container.offsetWidth;
     const textWidth = text.scrollWidth;
-    if (textWidth > containerWidth) {
-      setScale(containerWidth / textWidth);
-    } else {
-      setScale(1);
-    }
+    setScale(textWidth > containerWidth ? containerWidth / textWidth : 1);
   }, [fio, template]);
 
   const style = fioStyle(template);
@@ -282,8 +290,14 @@ export default function CertificateGenerator() {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState("");
   const [preparedFile, setPreparedFile] = useState<PreparedFile | null>(null);
-  const selectedTemplate =
-    CERTIFICATES.find((template) => template.id === selectedId) ?? CERTIFICATES[0];
+  const [fioNudges, setFioNudges] = useState<Record<string, number>>({});
+
+  const baseTemplate = CERTIFICATES.find((template) => template.id === selectedId) ?? CERTIFICATES[0];
+  const selectedNudge = fioNudges[selectedId] ?? 0;
+  const selectedTemplate = useMemo(
+    () => withNudge(baseTemplate, selectedNudge),
+    [baseTemplate, selectedNudge],
+  );
 
   const safeName = useMemo(
     () =>
@@ -293,6 +307,23 @@ export default function CertificateGenerator() {
         .replace(/^-|-$/g, "") || "certificate",
     [fio, selectedTemplate.id],
   );
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(FIO_NUDGE_STORAGE_KEY);
+      if (saved) setFioNudges(JSON.parse(saved) as Record<string, number>);
+    } catch {
+      setFioNudges({});
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FIO_NUDGE_STORAGE_KEY, JSON.stringify(fioNudges));
+    } catch {
+      // Local storage can be blocked in private mode. Preview and export still work.
+    }
+  }, [fioNudges]);
 
   useEffect(() => {
     const container = previewContainerRef.current;
@@ -321,6 +352,25 @@ export default function CertificateGenerator() {
       if (current) URL.revokeObjectURL(current.url);
       return null;
     });
+  };
+
+  const updateFioNudge = (delta: number) => {
+    setFioNudges((current) => ({
+      ...current,
+      [selectedId]: Math.max(-160, Math.min(160, (current[selectedId] ?? 0) + delta)),
+    }));
+    clearPreparedFile();
+    setError("");
+  };
+
+  const resetFioNudge = () => {
+    setFioNudges((current) => {
+      const next = { ...current };
+      delete next[selectedId];
+      return next;
+    });
+    clearPreparedFile();
+    setError("");
   };
 
   const deliverGeneratedFile = (blob: Blob, fileName: string, label: string) => {
@@ -396,8 +446,7 @@ export default function CertificateGenerator() {
               Генератор сертификатов
             </h1>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              Выберите шаблон, введите ФИО участника и скачайте готовый файл. Остальной текст уже
-              находится в шаблоне.
+              Выберите шаблон, введите ФИО участника, подгоните строку при необходимости и скачайте готовый файл.
             </p>
           </div>
 
@@ -433,6 +482,53 @@ export default function CertificateGenerator() {
                 placeholder="Иванова Мария Сергеевна"
               />
             </label>
+
+            <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-stone-900">Подгонка ФИО</span>
+                <span className="text-xs text-stone-500">{selectedNudge > 0 ? `+${selectedNudge}` : selectedNudge}px</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => updateFioNudge(-4)}
+                  className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-900 transition active:translate-y-px"
+                >
+                  выше
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateFioNudge(4)}
+                  className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-900 transition active:translate-y-px"
+                >
+                  ниже
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateFioNudge(-1)}
+                  className="h-9 rounded-md border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-700 transition active:translate-y-px"
+                >
+                  выше на 1px
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateFioNudge(1)}
+                  className="h-9 rounded-md border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-700 transition active:translate-y-px"
+                >
+                  ниже на 1px
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={resetFioNudge}
+                className="mt-2 h-9 w-full rounded-md bg-stone-200 px-3 text-xs font-semibold text-stone-700 transition active:translate-y-px"
+              >
+                сбросить для этого шаблона
+              </button>
+              <p className="mt-2 text-xs leading-5 text-stone-500">
+                Настройка сохраняется на этом устройстве и попадает в PNG/PDF.
+              </p>
+            </div>
 
             {error && (
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
