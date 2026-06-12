@@ -41,34 +41,31 @@ const PARTICIPANT_FIO: FioField = {
   sourceFontSize: 76,
 };
 
-const CAMP_FIO: FioField = {
-  sourceLeft: 422,
-  sourceTop: 1644,
-  sourceWidth: 1640,
-  sourceFontSize: 76,
-};
+function fio(sourceLeft: number, sourceTop: number, sourceWidth: number, sourceFontSize = 72): FioField {
+  return { sourceLeft, sourceTop, sourceWidth, sourceFontSize };
+}
 
-const CAMP_TEMPLATES: Array<{ id: string; title: string; file: string; fio?: FioField }> = [
-  { id: "vnimatelnyy", title: "Самый внимательный", file: "vnimatelnyy.png" },
-  { id: "komandnyy", title: "Лучший командный игрок", file: "druzhnyy.png" },
-  { id: "tvorcheskiy", title: "Самый творческий", file: "tvorcheskiy.png" },
-  { id: "druzhelyubnyy", title: "Самый дружелюбный", file: "druzhelyubnyy.png" },
-  { id: "aktivnyy", title: "Самый активный", file: "aktivnyy.png" },
-  { id: "zabavnyy", title: "Самый забавный", file: "zabavnyy.png" },
-  { id: "skromnyy", title: "Самый скромный", file: "skromnyy.png" },
-  { id: "kreativnyy", title: "Самый креативный", file: "kreativnyy.png" },
-  { id: "talantlivyy", title: "Самый талантливый", file: "talantlivyy.png" },
-  { id: "otvetstvennyy", title: "Самый ответственный", file: "otvetstvennyy.png" },
-  { id: "dobryy", title: "Самый добрый", file: "dobryy.png" },
-  { id: "veselyy", title: "Самый веселый", file: "veselyy.png" },
-  { id: "lovkiy", title: "Самый ловкий", file: "lovkiy.png" },
-  { id: "otzyvchivyy", title: "Самый отзывчивый", file: "otzyvchivyy.png" },
-  { id: "sportivnyy", title: "Самый спортивный", file: "sportivnyy.png" },
-  { id: "vezhlivyy", title: "Самый вежливый", file: "vezhlivyy.png" },
-  { id: "lyuboznatelnyy", title: "Самый любознательный", file: "lyuboznatelnyy.png" },
-  { id: "obshchitelnyy", title: "Самый общительный", file: "obshchitelnyy.png" },
-  { id: "prikolnyy", title: "Самый прикольный", file: "prikolnyy.png" },
-  { id: "muzykalnyy", title: "Самый музыкальный", file: "muzykalnyy.png" },
+const CAMP_TEMPLATES: Array<{ id: string; title: string; file: string; fio: FioField }> = [
+  { id: "vnimatelnyy", title: "Самый внимательный", file: "vnimatelnyy.png", fio: fio(359, 1586, 1830) },
+  { id: "komandnyy", title: "Лучший командный игрок", file: "druzhnyy.png", fio: fio(381, 1585, 1824) },
+  { id: "tvorcheskiy", title: "Самый творческий", file: "tvorcheskiy.png", fio: fio(370, 1491, 1768) },
+  { id: "druzhelyubnyy", title: "Самый дружелюбный", file: "druzhelyubnyy.png", fio: fio(379, 1558, 1773) },
+  { id: "aktivnyy", title: "Самый активный", file: "aktivnyy.png", fio: fio(440, 1537, 1687) },
+  { id: "zabavnyy", title: "Самый забавный", file: "zabavnyy.png", fio: fio(373, 1563, 1802) },
+  { id: "skromnyy", title: "Самый скромный", file: "skromnyy.png", fio: fio(370, 1543, 1797) },
+  { id: "kreativnyy", title: "Самый креативный", file: "kreativnyy.png", fio: fio(327, 1547, 1855) },
+  { id: "talantlivyy", title: "Самый талантливый", file: "talantlivyy.png", fio: fio(370, 1533, 1798) },
+  { id: "otvetstvennyy", title: "Самый ответственный", file: "otvetstvennyy.png", fio: fio(339, 1557, 1838) },
+  { id: "dobryy", title: "Самый добрый", file: "dobryy.png", fio: fio(479, 1691, 1562) },
+  { id: "veselyy", title: "Самый веселый", file: "veselyy.png", fio: fio(379, 1737, 1720) },
+  { id: "lovkiy", title: "Самый ловкий", file: "lovkiy.png", fio: fio(414, 1663, 1680) },
+  { id: "otzyvchivyy", title: "Самый отзывчивый", file: "otzyvchivyy.png", fio: fio(346, 1343, 1788) },
+  { id: "sportivnyy", title: "Самый спортивный", file: "sportivnyy.png", fio: fio(408, 1809, 1681) },
+  { id: "vezhlivyy", title: "Самый вежливый", file: "vezhlivyy.png", fio: fio(338, 1628, 1811) },
+  { id: "lyuboznatelnyy", title: "Самый любознательный", file: "lyuboznatelnyy.png", fio: fio(306, 1748, 1861) },
+  { id: "obshchitelnyy", title: "Самый общительный", file: "obshchitelnyy.png", fio: fio(402, 1684, 1707) },
+  { id: "prikolnyy", title: "Самый прикольный", file: "prikolnyy.png", fio: fio(571, 1659, 1341) },
+  { id: "muzykalnyy", title: "Самый музыкальный", file: "muzykalnyy.png", fio: fio(445, 1699, 1586) },
 ];
 
 const CERTIFICATES: CertificateTemplate[] = [
@@ -88,7 +85,7 @@ const CERTIFICATES: CertificateTemplate[] = [
     background: `/certificates/camp/${template.file}`,
     sourceWidth: 2482,
     sourceHeight: 3508,
-    fio: template.fio ?? CAMP_FIO,
+    fio: template.fio,
   })),
 ];
 
@@ -106,7 +103,7 @@ function fioStyle(template: CertificateTemplate): CSSProperties {
     left: fromSourceX(template.fio.sourceLeft, template),
     width: fromSourceX(template.fio.sourceWidth, template),
     fontSize: fromSourceX(template.fio.sourceFontSize, template),
-    lineHeight: 1.08,
+    lineHeight: 1.04,
     fontWeight: 700,
     color: "#071d49",
     textAlign: "center",
@@ -148,7 +145,19 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string) {
   });
 }
 
-async function createCertificateCanvas(fio: string, template: CertificateTemplate) {
+function fitFontSize(ctx: CanvasRenderingContext2D, name: string, template: CertificateTemplate) {
+  let fontSize = template.fio.sourceFontSize;
+
+  do {
+    ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
+    if (ctx.measureText(name).width <= template.fio.sourceWidth - 64 || fontSize <= 46) break;
+    fontSize -= 2;
+  } while (fontSize > 46);
+
+  return fontSize;
+}
+
+async function createCertificateCanvas(fioValue: string, template: CertificateTemplate) {
   const canvas = document.createElement("canvas");
   canvas.width = template.sourceWidth;
   canvas.height = template.sourceHeight;
@@ -159,19 +168,13 @@ async function createCertificateCanvas(fio: string, template: CertificateTemplat
   const background = await loadImage(template.background);
   ctx.drawImage(background, 0, 0, template.sourceWidth, template.sourceHeight);
 
-  const name = fio.trim();
+  const name = fioValue.trim();
   if (name) {
-    let fontSize = template.fio.sourceFontSize;
+    const fontSize = fitFontSize(ctx, name, template);
+    ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillStyle = "#071d49";
-
-    do {
-      ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
-      if (ctx.measureText(name).width <= template.fio.sourceWidth - 48 || fontSize <= 48) break;
-      fontSize -= 2;
-    } while (fontSize > 48);
-
     ctx.fillText(
       name,
       template.fio.sourceLeft + template.fio.sourceWidth / 2,
@@ -223,13 +226,10 @@ function FioPreview({ fio, template }: { fio: string; template: CertificateTempl
     const container = containerRef.current;
     const text = textRef.current;
     if (!container || !text) return;
+
     const containerWidth = container.offsetWidth;
     const textWidth = text.scrollWidth;
-    if (textWidth > containerWidth) {
-      setScale(containerWidth / textWidth);
-    } else {
-      setScale(1);
-    }
+    setScale(textWidth > containerWidth ? containerWidth / textWidth : 1);
   }, [fio, template]);
 
   const style = fioStyle(template);
@@ -243,7 +243,7 @@ function FioPreview({ fio, template }: { fio: string; template: CertificateTempl
         top: style.top,
         left: style.left,
         width: style.width,
-        height: (style.fontSize as number) * 1.2,
+        height: (style.fontSize as number) * 1.14,
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
@@ -261,6 +261,7 @@ function FioPreview({ fio, template }: { fio: string; template: CertificateTempl
           transformOrigin: "center top",
           transform: `scaleX(${scale})`,
           display: "inline-block",
+          fontFamily: `Georgia, "Times New Roman", serif`,
         }}
       >
         {fio}
