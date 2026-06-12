@@ -50,7 +50,7 @@ const CAMP_FIO: FioField = {
 
 const CAMP_TEMPLATES: Array<{ id: string; title: string; file: string; fio?: FioField }> = [
   { id: "vnimatelnyy", title: "Самый внимательный", file: "vnimatelnyy.png" },
-  { id: "komandnyy", title: "Лучший командный игрок", file: "druzhnyy.png" },
+  { id: "komandnyy", title: "Самый дружный", file: "druzhnyy.png" },
   { id: "tvorcheskiy", title: "Самый творческий", file: "tvorcheskiy.png" },
   { id: "druzhelyubnyy", title: "Самый дружелюбный", file: "druzhelyubnyy.png" },
   { id: "aktivnyy", title: "Самый активный", file: "aktivnyy.png" },
