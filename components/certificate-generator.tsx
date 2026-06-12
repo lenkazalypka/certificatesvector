@@ -111,6 +111,11 @@ function fioStyle(template: CertificateTemplate): CSSProperties {
     color: "#071d49",
     textAlign: "center",
     letterSpacing: "0",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "center",
   };
 }
 
@@ -207,6 +212,61 @@ async function shareBlob(blob: Blob, fileName: string) {
   if (!file || !canShareFile) throw new Error("Sharing is unavailable");
 
   await navigator.share({ files: [file], title: fileName });
+}
+
+function FioPreview({ fio, template }: { fio: string; template: CertificateTemplate }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const text = textRef.current;
+    if (!container || !text) return;
+    const containerWidth = container.offsetWidth;
+    const textWidth = text.scrollWidth;
+    if (textWidth > containerWidth) {
+      setScale(containerWidth / textWidth);
+    } else {
+      setScale(1);
+    }
+  }, [fio, template]);
+
+  const style = fioStyle(template);
+
+  return (
+    <div
+      ref={containerRef}
+      data-testid="fio-layer"
+      className="absolute overflow-hidden"
+      style={{
+        top: style.top,
+        left: style.left,
+        width: style.width,
+        height: (style.fontSize as number) * 1.2,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+      }}
+    >
+      <span
+        ref={textRef}
+        style={{
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          color: style.color,
+          letterSpacing: style.letterSpacing,
+          lineHeight: style.lineHeight,
+          whiteSpace: "nowrap",
+          transformOrigin: "center top",
+          transform: `scaleX(${scale})`,
+          display: "inline-block",
+        }}
+      >
+        {fio}
+      </span>
+    </div>
+  );
 }
 
 export default function CertificateGenerator() {
@@ -464,13 +524,7 @@ export default function CertificateGenerator() {
                     draggable={false}
                   />
 
-                  <div
-                    data-testid="fio-layer"
-                    className="absolute whitespace-pre-line break-words"
-                    style={fioStyle(selectedTemplate)}
-                  >
-                    {fio}
-                  </div>
+                  <FioPreview fio={fio} template={selectedTemplate} />
                 </div>
               </div>
             </div>
